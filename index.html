@@ -82,6 +82,14 @@
             background-color: var(--secondary-color);
         }
         
+        .btn-danger {
+            background-color: #f44336;
+        }
+        
+        .btn-danger:hover {
+            background-color: #d32f2f;
+        }
+        
         .message {
             padding: 10px;
             margin: 5px 0;
@@ -130,6 +138,7 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             cursor: pointer;
             transition: transform 0.2s;
+            position: relative;
         }
         
         .chat-card:hover {
@@ -151,6 +160,22 @@
             margin: 5px 0;
             font-size: 0.9em;
             color: #666;
+        }
+        
+        .chat-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+        }
+        
+        .chat-actions button {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 12px;
         }
         
         .hidden {
@@ -287,6 +312,7 @@
                             <p>Пригласительная ссылка:</p>
                             <div id="chatLink"></div>
                             <button onclick="copyChatLink()">Копировать ссылку</button>
+                            <button class="btn-danger" onclick="deleteCurrentChat()" style="margin-top: 10px;">Удалить чат</button>
                         </div>
                         <div id="messagesContainer"></div>
                         <div class="message-input-area">
@@ -374,6 +400,9 @@
             const savedTheme = localStorage.getItem('chatAppTheme') || 'light';
             changeTheme(savedTheme, true);
             
+            // Восстановление данных из localStorage
+            restoreData();
+            
             if (token) {
                 const user = users.find(u => u.token === token);
                 if (user) {
@@ -408,13 +437,31 @@
                         document.getElementById('avatarPreview').src = event.target.result;
                         if (currentUser) {
                             currentUser.avatar = event.target.result;
-                            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                            saveData();
                         }
                     };
                     reader.readAsDataURL(file);
                 }
             });
         };
+
+        // Функции для работы с данными
+        function saveData() {
+            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+            localStorage.setItem('chatAppChats', JSON.stringify(chats));
+            if (currentUser) {
+                localStorage.setItem('chatAppToken', currentUser.token);
+            }
+        }
+
+        function restoreData() {
+            // Удаляем чаты, которые не существуют в основном списке
+            users.forEach(user => {
+                user.chats = user.chats.filter(chatId => 
+                    chats.some(chat => chat.id === chatId)
+            });
+            saveData();
+        }
 
         // Функции авторизации
         function showRegisterForm() {
@@ -436,8 +483,7 @@
                 currentUser = user;
                 const token = generateToken();
                 user.token = token;
-                localStorage.setItem('chatAppToken', token);
-                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                saveData();
                 showMainInterface();
                 loadUserChats();
                 
@@ -481,8 +527,7 @@
             
             users.push(newUser);
             currentUser = newUser;
-            localStorage.setItem('chatAppUsers', JSON.stringify(users));
-            localStorage.setItem('chatAppToken', token);
+            saveData();
             showMainInterface();
             
             // Устанавливаем аватар
@@ -521,9 +566,7 @@
             chats.push(newChat);
             currentUser.chats.push(chatId);
             
-            localStorage.setItem('chatAppChats', JSON.stringify(chats));
-            localStorage.setItem('chatAppUsers', JSON.stringify(users));
-            
+            saveData();
             openChat(newChat);
         }
 
@@ -548,7 +591,13 @@
                     if (currentChat && chat.id === currentChat.id) {
                         chatCard.classList.add('active');
                     }
+                    
+                    const isCreator = chat.creator === currentUser.id;
+                    
                     chatCard.innerHTML = `
+                        <div class="chat-actions">
+                            ${isCreator ? `<button class="btn-danger" onclick="deleteChat('${chat.id}', event)">×</button>` : ''}
+                        </div>
                         <h3>${chat.name}</h3>
                         <p>${lastMessage.substring(0, 30)}${lastMessage.length > 30 ? '...' : ''}</p>
                         <p>Участников: ${chat.members.length}</p>
@@ -605,19 +654,59 @@
         function joinChat(chatId) {
             const chat = chats.find(c => c.id === chatId);
             if (!chat) {
-                alert('Чат не найден');
+                alert('Чат не найден или был удалён');
+                // Удаляем параметр join из URL
+                const url = new URL(window.location);
+                url.searchParams.delete('join');
+                window.history.pushState({}, '', url);
                 return;
             }
             
             if (!chat.members.includes(currentUser.id)) {
                 chat.members.push(currentUser.id);
                 currentUser.chats.push(chatId);
-                
-                localStorage.setItem('chatAppChats', JSON.stringify(chats));
-                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                saveData();
             }
             
             openChat(chat);
+        }
+
+        function deleteChat(chatId, event) {
+            if (event) event.stopPropagation();
+            
+            if (!confirm('Вы уверены, что хотите удалить этот чат? Все сообщения будут потеряны.')) {
+                return;
+            }
+            
+            // Удаляем чат из общего списка
+            chats = chats.filter(c => c.id !== chatId);
+            
+            // Удаляем чат у всех участников
+            users.forEach(user => {
+                user.chats = user.chats.filter(c => c !== chatId);
+            });
+            
+            // Сохраняем изменения
+            saveData();
+            
+            // Если удаляем текущий открытый чат
+            if (currentChat && currentChat.id === chatId) {
+                document.getElementById('chatTitle').textContent = 'Выберите чат';
+                document.getElementById('messagesContainer').innerHTML = '';
+                document.getElementById('chatLinkContainer').classList.add('hidden');
+                document.getElementById('messageInput').disabled = true;
+                document.getElementById('sendButton').disabled = true;
+                currentChat = null;
+            }
+            
+            // Обновляем список чатов
+            loadUserChats();
+        }
+
+        function deleteCurrentChat() {
+            if (currentChat) {
+                deleteChat(currentChat.id);
+            }
         }
 
         function sendMessage() {
@@ -655,7 +744,7 @@
             };
             
             currentChat.messages.push(newMessage);
-            localStorage.setItem('chatAppChats', JSON.stringify(chats));
+            saveData();
             
             // Обновляем интерфейс
             const messagesContainer = document.getElementById('messagesContainer');
@@ -712,15 +801,14 @@
             const newNickname = document.getElementById('nicknameInput').value.trim();
             if (newNickname && currentUser) {
                 currentUser.nickname = newNickname;
-                localStorage.setItem('chatAppUsers', JSON.stringify(users));
                 
                 // Обновляем аватар, если используется дефолтный
                 if (currentUser.avatar.includes('ui-avatars.com')) {
                     currentUser.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(newNickname)}&background=random`;
                     document.getElementById('avatarPreview').src = currentUser.avatar;
-                    localStorage.setItem('chatAppUsers', JSON.stringify(users));
                 }
                 
+                saveData();
                 alert('Никнейм обновлен');
             }
         }
@@ -737,7 +825,7 @@
             // Обновляем текущую тему
             if (currentUser) {
                 currentUser.theme = themeName;
-                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                saveData();
             }
             
             // Обновляем выбранную тему в настройках
