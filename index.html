@@ -354,12 +354,42 @@
     </div>
 
     <script>
-        // Хранилище данных
-        let users = JSON.parse(localStorage.getItem('chatAppUsers')) || [];
-        let chats = JSON.parse(localStorage.getItem('chatAppChats')) || [];
+        // Инициализация хранилища
+        function initStorage() {
+            if (!localStorage.getItem('chatAppUsers')) {
+                localStorage.setItem('chatAppUsers', JSON.stringify([]));
+            }
+            if (!localStorage.getItem('chatAppChats')) {
+                localStorage.setItem('chatAppChats', JSON.stringify([]));
+            }
+        }
+
+        // Получение данных из хранилища
+        function getUsers() {
+            const users = JSON.parse(localStorage.getItem('chatAppUsers'));
+            return Array.isArray(users) ? users : [];
+        }
+
+        function getChats() {
+            const chats = JSON.parse(localStorage.getItem('chatAppChats'));
+            return Array.isArray(chats) ? chats : [];
+        }
+
+        // Сохранение данных
+        function saveUsers(users) {
+            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+        }
+
+        function saveChats(chats) {
+            localStorage.setItem('chatAppChats', JSON.stringify(chats));
+        }
+
+        // Текущие данные
         let currentUser = null;
         let currentChat = null;
-        let themes = {
+        
+        // Темы оформления
+        const themes = {
             light: {
                 '--bg-color': '#f5f5f5',
                 '--primary-color': '#4CAF50',
@@ -392,6 +422,8 @@
 
         // Инициализация при загрузке
         window.onload = function() {
+            initStorage();
+            
             const urlParams = new URLSearchParams(window.location.search);
             const chatId = urlParams.get('join');
             const token = localStorage.getItem('chatAppToken');
@@ -400,10 +432,8 @@
             const savedTheme = localStorage.getItem('chatAppTheme') || 'light';
             changeTheme(savedTheme, true);
             
-            // Восстановление данных из localStorage
-            restoreData();
-            
             if (token) {
+                const users = getUsers();
                 const user = users.find(u => u.token === token);
                 if (user) {
                     currentUser = user;
@@ -437,31 +467,18 @@
                         document.getElementById('avatarPreview').src = event.target.result;
                         if (currentUser) {
                             currentUser.avatar = event.target.result;
-                            saveData();
+                            const users = getUsers();
+                            const userIndex = users.findIndex(u => u.id === currentUser.id);
+                            if (userIndex !== -1) {
+                                users[userIndex] = currentUser;
+                                saveUsers(users);
+                            }
                         }
                     };
                     reader.readAsDataURL(file);
                 }
             });
         };
-
-        // Функции для работы с данными
-        function saveData() {
-            localStorage.setItem('chatAppUsers', JSON.stringify(users));
-            localStorage.setItem('chatAppChats', JSON.stringify(chats));
-            if (currentUser) {
-                localStorage.setItem('chatAppToken', currentUser.token);
-            }
-        }
-
-        function restoreData() {
-            // Удаляем чаты, которые не существуют в основном списке
-            users.forEach(user => {
-                user.chats = user.chats.filter(chatId => 
-                    chats.some(chat => chat.id === chatId)
-            });
-            saveData();
-        }
 
         // Функции авторизации
         function showRegisterForm() {
@@ -478,12 +495,20 @@
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
             
+            const users = getUsers();
             const user = users.find(u => u.email === email && u.password === password);
             if (user) {
                 currentUser = user;
                 const token = generateToken();
                 user.token = token;
-                saveData();
+                localStorage.setItem('chatAppToken', token);
+                
+                const userIndex = users.findIndex(u => u.id === user.id);
+                if (userIndex !== -1) {
+                    users[userIndex] = user;
+                    saveUsers(users);
+                }
+                
                 showMainInterface();
                 loadUserChats();
                 
@@ -508,6 +533,7 @@
             const password = document.getElementById('registerPassword').value;
             const nickname = document.getElementById('registerNickname').value || email.split('@')[0];
             
+            const users = getUsers();
             if (users.some(u => u.email === email)) {
                 alert('Пользователь с таким email уже существует');
                 return;
@@ -526,8 +552,10 @@
             };
             
             users.push(newUser);
+            saveUsers(users);
+            
             currentUser = newUser;
-            saveData();
+            localStorage.setItem('chatAppToken', token);
             showMainInterface();
             
             // Устанавливаем аватар
@@ -563,10 +591,18 @@
                 createdAt: new Date().toISOString()
             };
             
+            const chats = getChats();
             chats.push(newChat);
-            currentUser.chats.push(chatId);
+            saveChats(chats);
             
-            saveData();
+            const users = getUsers();
+            const userIndex = users.findIndex(u => u.id === currentUser.id);
+            if (userIndex !== -1) {
+                users[userIndex].chats.push(chatId);
+                saveUsers(users);
+                currentUser = users[userIndex];
+            }
+            
             openChat(newChat);
         }
 
@@ -579,6 +615,7 @@
                 return;
             }
             
+            const chats = getChats();
             currentUser.chats.forEach(chatId => {
                 const chat = chats.find(c => c.id === chatId);
                 if (chat) {
@@ -622,6 +659,7 @@
             const messagesContainer = document.getElementById('messagesContainer');
             messagesContainer.innerHTML = '';
             
+            const users = getUsers();
             chat.messages.forEach(msg => {
                 const messageElement = document.createElement('div');
                 messageElement.className = 'message';
@@ -652,6 +690,7 @@
         }
 
         function joinChat(chatId) {
+            const chats = getChats();
             const chat = chats.find(c => c.id === chatId);
             if (!chat) {
                 alert('Чат не найден или был удалён');
@@ -664,8 +703,19 @@
             
             if (!chat.members.includes(currentUser.id)) {
                 chat.members.push(currentUser.id);
-                currentUser.chats.push(chatId);
-                saveData();
+                const chatIndex = chats.findIndex(c => c.id === chatId);
+                if (chatIndex !== -1) {
+                    chats[chatIndex] = chat;
+                    saveChats(chats);
+                }
+                
+                const users = getUsers();
+                const userIndex = users.findIndex(u => u.id === currentUser.id);
+                if (userIndex !== -1) {
+                    users[userIndex].chats.push(chatId);
+                    saveUsers(users);
+                    currentUser = users[userIndex];
+                }
             }
             
             openChat(chat);
@@ -678,16 +728,23 @@
                 return;
             }
             
+            let chats = getChats();
             // Удаляем чат из общего списка
             chats = chats.filter(c => c.id !== chatId);
+            saveChats(chats);
             
             // Удаляем чат у всех участников
+            const users = getUsers();
             users.forEach(user => {
                 user.chats = user.chats.filter(c => c !== chatId);
             });
+            saveUsers(users);
             
-            // Сохраняем изменения
-            saveData();
+            // Обновляем текущего пользователя
+            const userIndex = users.findIndex(u => u.id === currentUser.id);
+            if (userIndex !== -1) {
+                currentUser = users[userIndex];
+            }
             
             // Если удаляем текущий открытый чат
             if (currentChat && currentChat.id === chatId) {
@@ -743,8 +800,13 @@
                 timestamp: new Date().toISOString()
             };
             
-            currentChat.messages.push(newMessage);
-            saveData();
+            let chats = getChats();
+            const chatIndex = chats.findIndex(c => c.id === currentChat.id);
+            if (chatIndex !== -1) {
+                chats[chatIndex].messages.push(newMessage);
+                saveChats(chats);
+                currentChat = chats[chatIndex];
+            }
             
             // Обновляем интерфейс
             const messagesContainer = document.getElementById('messagesContainer');
@@ -802,13 +864,20 @@
             if (newNickname && currentUser) {
                 currentUser.nickname = newNickname;
                 
-                // Обновляем аватар, если используется дефолтный
-                if (currentUser.avatar.includes('ui-avatars.com')) {
-                    currentUser.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(newNickname)}&background=random`;
-                    document.getElementById('avatarPreview').src = currentUser.avatar;
+                const users = getUsers();
+                const userIndex = users.findIndex(u => u.id === currentUser.id);
+                if (userIndex !== -1) {
+                    // Обновляем аватар, если используется дефолтный
+                    if (users[userIndex].avatar.includes('ui-avatars.com')) {
+                        users[userIndex].avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(newNickname)}&background=random`;
+                        document.getElementById('avatarPreview').src = users[userIndex].avatar;
+                    }
+                    
+                    users[userIndex].nickname = newNickname;
+                    saveUsers(users);
+                    currentUser = users[userIndex];
                 }
                 
-                saveData();
                 alert('Никнейм обновлен');
             }
         }
@@ -825,7 +894,12 @@
             // Обновляем текущую тему
             if (currentUser) {
                 currentUser.theme = themeName;
-                saveData();
+                const users = getUsers();
+                const userIndex = users.findIndex(u => u.id === currentUser.id);
+                if (userIndex !== -1) {
+                    users[userIndex].theme = themeName;
+                    saveUsers(users);
+                }
             }
             
             // Обновляем выбранную тему в настройках
