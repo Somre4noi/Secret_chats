@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Приватный чат по ссылке</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .auth-container, .chat-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            background: #e9e9e9;
+            border-radius: 4px;
+        }
+        .message img {
+            max-width: 100%;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .user-info {
+            font-weight: bold;
+            color: #333;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .chat-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .chat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+            width: calc(33% - 20px);
+        }
+        .hidden {
+            display: none;
+        }
+        #chatLink {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Форма авторизации -->
+        <div id="authContainer" class="auth-container">
+            <h1>Добро пожаловать в приватный чат</h1>
+            <div id="loginForm">
+                <h2>Вход</h2>
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Пароль" required>
+                <button onclick="login()">Войти</button>
+                <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
+            </div>
+            <div id="registerForm" class="hidden">
+                <h2>Регистрация</h2>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Пароль" required>
+                <button onclick="register()">Зарегистрироваться</button>
+                <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
+            </div>
+        </div>
+
+        <!-- Основной интерфейс чата -->
+        <div id="mainContainer" class="hidden">
+            <div class="chat-container">
+                <h2>Мои чаты</h2>
+                <button onclick="createNewChat()">Создать новый чат</button>
+                <div id="chatList" class="chat-list"></div>
+            </div>
+
+            <div id="currentChatContainer" class="chat-container hidden">
+                <h2 id="chatTitle"></h2>
+                <div id="chatLinkContainer">
+                    <p>Пригласительная ссылка:</p>
+                    <div id="chatLink"></div>
+                    <button onclick="copyChatLink()">Копировать ссылку</button>
+                </div>
+                <div id="messagesContainer" style="height: 400px; overflow-y: auto; margin: 20px 0;"></div>
+                <div>
+                    <input type="text" id="messageInput" placeholder="Введите сообщение...">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <button onclick="sendMessage()">Отправить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Хранилище данных (заменяет базу данных)
+        let users = JSON.parse(localStorage.getItem('chatAppUsers')) || [];
+        let chats = JSON.parse(localStorage.getItem('chatAppChats')) || [];
+        let currentUser = null;
+        let currentChat = null;
+
+        // Инициализация при загрузке
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const chatId = urlParams.get('join');
+            const token = localStorage.getItem('chatAppToken');
+            
+            if (token) {
+                const user = users.find(u => u.token === token);
+                if (user) {
+                    currentUser = user;
+                    showMainInterface();
+                    
+                    if (chatId) {
+                        joinChat(chatId);
+                    } else {
+                        loadUserChats();
+                    }
+                    return;
+                }
+            }
+            
+            if (chatId) {
+                document.getElementById('loginForm').scrollIntoView();
+                alert('Войдите или зарегистрируйтесь, чтобы присоединиться к чату');
+            }
+        };
+
+        // Функции авторизации
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showLoginForm() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const user = users.find(u => u.email === email && u.password === password);
+            if (user) {
+                currentUser = user;
+                const token = generateToken();
+                user.token = token;
+                localStorage.setItem('chatAppToken', token);
+                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                showMainInterface();
+                loadUserChats();
+                
+                // Проверяем, есть ли в URL приглашение в чат
+                const urlParams = new URLSearchParams(window.location.search);
+                const chatId = urlParams.get('join');
+                if (chatId) {
+                    joinChat(chatId);
+                }
+            } else {
+                alert('Неверный email или пароль');
+            }
+        }
+
+        function register() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            
+            if (users.some(u => u.email === email)) {
+                alert('Пользователь с таким email уже существует');
+                return;
+            }
+            
+            const token = generateToken();
+            const newUser = {
+                id: generateId(),
+                email,
+                password,
+                token,
+                chats: []
+            };
+            
+            users.push(newUser);
+            currentUser = newUser;
+            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+            localStorage.setItem('chatAppToken', token);
+            showMainInterface();
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('chatAppToken');
+            document.getElementById('mainContainer').classList.add('hidden');
+            document.getElementById('authContainer').classList.remove('hidden');
+            window.location.href = window.location.pathname;
+        }
+
+        // Основной интерфейс
+        function showMainInterface() {
+            document.getElementById('authContainer').classList.add('hidden');
+            document.getElementById('mainContainer').classList.remove('hidden');
+        }
+
+        function createNewChat() {
+            const chatName = prompt('Введите название чата:');
+            if (!chatName) return;
+            
+            const chatId = generateId();
+            const newChat = {
+                id: chatId,
+                name: chatName,
+                creator: currentUser.id,
+                members: [currentUser.id],
+                messages: [],
+                createdAt: new Date().toISOString()
+            };
+            
+            chats.push(newChat);
+            currentUser.chats.push(chatId);
+            
+            localStorage.setItem('chatAppChats', JSON.stringify(chats));
+            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+            
+            openChat(newChat);
+        }
+
+        function loadUserChats() {
+            const chatList = document.getElementById('chatList');
+            chatList.innerHTML = '';
+            
+            if (!currentUser || !currentUser.chats || currentUser.chats.length === 0) {
+                chatList.innerHTML = '<p>У вас пока нет чатов. Создайте новый!</p>';
+                return;
+            }
+            
+            currentUser.chats.forEach(chatId => {
+                const chat = chats.find(c => c.id === chatId);
+                if (chat) {
+                    const chatCard = document.createElement('div');
+                    chatCard.className = 'chat-card';
+                    chatCard.innerHTML = `
+                        <h3>${chat.name}</h3>
+                        <p>Участников: ${chat.members.length}</p>
+                        <p>Сообщений: ${chat.messages.length}</p>
+                    `;
+                    chatCard.onclick = () => openChat(chat);
+                    chatList.appendChild(chatCard);
+                }
+            });
+        }
+
+        function openChat(chat) {
+            currentChat = chat;
+            document.getElementById('chatTitle').textContent = chat.name;
+            document.getElementById('chatLink').textContent = `${window.location.origin}${window.location.pathname}?join=${chat.id}`;
+            
+            // Показываем сообщения
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = '';
+            
+            chat.messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message';
+                
+                const sender = users.find(u => u.id === msg.sender);
+                const senderName = sender ? sender.email : 'Неизвестный';
+                
+                let content = msg.text;
+                if (msg.image) {
+                    content += `<br><img src="${msg.image}" alt="Прикрепленное изображение">`;
+                }
+                
+                messageElement.innerHTML = `
+                    <div class="user-info">${senderName}</div>
+                    <div>${content}</div>
+                    <div class="timestamp">${new Date(msg.timestamp).toLocaleString()}</div>
+                `;
+                messagesContainer.appendChild(messageElement);
+            });
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            document.getElementById('currentChatContainer').classList.remove('hidden');
+        }
+
+        function joinChat(chatId) {
+            const chat = chats.find(c => c.id === chatId);
+            if (!chat) {
+                alert('Чат не найден');
+                return;
+            }
+            
+            if (!chat.members.includes(currentUser.id)) {
+                chat.members.push(currentUser.id);
+                currentUser.chats.push(chatId);
+                
+                localStorage.setItem('chatAppChats', JSON.stringify(chats));
+                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+            }
+            
+            openChat(chat);
+        }
+
+        function sendMessage() {
+            if (!currentChat) return;
+            
+            const messageInput = document.getElementById('messageInput');
+            const fileInput = document.getElementById('fileInput');
+            const text = messageInput.value.trim();
+            const file = fileInput.files[0];
+            
+            if (!text && !file) return;
+            
+            // Для демо-версии сохраняем изображения как Data URL
+            // В реальном приложении нужно загружать на сервер
+            let imageData = null;
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imageData = e.target.result;
+                    saveMessage(text, imageData);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                saveMessage(text, null);
+            }
+        }
+
+        function saveMessage(text, imageData) {
+            const newMessage = {
+                id: generateId(),
+                sender: currentUser.id,
+                text: text || '',
+                image: imageData || null,
+                timestamp: new Date().toISOString()
+            };
+            
+            currentChat.messages.push(newMessage);
+            localStorage.setItem('chatAppChats', JSON.stringify(chats));
+            
+            // Обновляем интерфейс
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            
+            let content = newMessage.text;
+            if (newMessage.image) {
+                content += `<br><img src="${newMessage.image}" alt="Прикрепленное изображение">`;
+            }
+            
+            messageElement.innerHTML = `
+                <div class="user-info">${currentUser.email}</div>
+                <div>${content}</div>
+                <div class="timestamp">${new Date(newMessage.timestamp).toLocaleString()}</div>
+            `;
+            messagesContainer.appendChild(messageElement);
+            
+            // Очищаем поля ввода
+            document.getElementById('messageInput').value = '';
+            document.getElementById('fileInput').value = '';
+            
+            // Прокручиваем к новому сообщению
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function copyChatLink() {
+            const linkElement = document.getElementById('chatLink');
+            const range = document.createRange();
+            range.selectNode(linkElement);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            alert('Ссылка скопирована в буфер обмена');
+        }
+
+        // Вспомогательные функции
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        function generateToken() {
+            return Math.random().toString(36).substr(2) + Math.random().toString(36).substr(2);
+        }
+    </script>
+</body>
+</html>
