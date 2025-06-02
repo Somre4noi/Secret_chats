@@ -3,84 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Приватный чат по ссылке</title>
+    <title>Приватный чат</title>
     <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --primary-color: #4CAF50;
+            --secondary-color: #45a049;
+            --text-color: #333;
+            --card-bg: white;
+        }
+        
+        body.dark-theme {
+            --bg-color: #1a1a1a;
+            --primary-color: #2E7D32;
+            --secondary-color: #1B5E20;
+            --text-color: #f0f0f0;
+            --card-bg: #2d2d2d;
+        }
+        
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f5f5f5;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: all 0.3s ease;
         }
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
-        .auth-container, .chat-container {
-            background: white;
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .auth-container, .chat-container, .settings-container {
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             margin-bottom: 20px;
         }
-        h1, h2 {
-            color: #333;
+        
+        h1, h2, h3 {
+            color: var(--text-color);
+            margin-top: 0;
         }
-        input, button {
+        
+        input, button, select {
             padding: 10px;
             margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
             width: 100%;
             box-sizing: border-box;
+            background-color: var(--card-bg);
+            color: var(--text-color);
         }
+        
         button {
-            background-color: #4CAF50;
+            background-color: var(--primary-color);
             color: white;
             border: none;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
+        
         button:hover {
-            background-color: #45a049;
+            background-color: var(--secondary-color);
         }
+        
         .message {
             padding: 10px;
             margin: 5px 0;
-            background: #e9e9e9;
+            background: rgba(0,0,0,0.05);
             border-radius: 4px;
+            border-left: 3px solid var(--primary-color);
         }
+        
         .message img {
             max-width: 100%;
             margin-top: 10px;
             border-radius: 4px;
+            max-height: 200px;
         }
+        
         .user-info {
             font-weight: bold;
-            color: #333;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
         }
+        
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 8px;
+            object-fit: cover;
+        }
+        
         .timestamp {
             font-size: 0.8em;
             color: #666;
         }
+        
         .chat-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
         }
+        
         .chat-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             cursor: pointer;
-            width: calc(33% - 20px);
+            transition: transform 0.2s;
         }
+        
+        .chat-card:hover {
+            transform: translateY(-3px);
+        }
+        
+        .chat-card.active {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .chat-card h3 {
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .chat-card p {
+            margin: 5px 0;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
         .hidden {
             display: none;
         }
+        
         #chatLink {
-            background: #f0f0f0;
+            background: rgba(0,0,0,0.05);
             padding: 10px;
             border-radius: 4px;
             word-break: break-all;
+            font-size: 0.9em;
+        }
+        
+        .chat-view {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+        }
+        
+        .chat-sidebar {
+            width: 300px;
+        }
+        
+        .chat-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #messagesContainer {
+            flex: 1;
+            overflow-y: auto;
+            margin: 20px 0;
+            padding-right: 10px;
+        }
+        
+        .message-input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-input-area input {
+            flex: 1;
+        }
+        
+        .avatar-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 15px;
+        }
+        
+        .settings-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .theme-selector {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .theme-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .theme-option.selected {
+            border-color: var(--primary-color);
+        }
+        
+        @media (max-width: 768px) {
+            .chat-view {
+                flex-direction: column;
+            }
+            
+            .chat-sidebar {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -100,6 +255,7 @@
                 <h2>Регистрация</h2>
                 <input type="email" id="registerEmail" placeholder="Email" required>
                 <input type="password" id="registerPassword" placeholder="Пароль" required>
+                <input type="text" id="registerNickname" placeholder="Ваш никнейм">
                 <button onclick="register()">Зарегистрироваться</button>
                 <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
             </div>
@@ -107,35 +263,106 @@
 
         <!-- Основной интерфейс чата -->
         <div id="mainContainer" class="hidden">
-            <div class="chat-container">
-                <h2>Мои чаты</h2>
-                <button onclick="createNewChat()">Создать новый чат</button>
-                <div id="chatList" class="chat-list"></div>
-            </div>
-
-            <div id="currentChatContainer" class="chat-container hidden">
-                <h2 id="chatTitle"></h2>
-                <div id="chatLinkContainer">
-                    <p>Пригласительная ссылка:</p>
-                    <div id="chatLink"></div>
-                    <button onclick="copyChatLink()">Копировать ссылку</button>
-                </div>
-                <div id="messagesContainer" style="height: 400px; overflow-y: auto; margin: 20px 0;"></div>
+            <div class="header">
+                <h1>Приватный чат</h1>
                 <div>
-                    <input type="text" id="messageInput" placeholder="Введите сообщение...">
-                    <input type="file" id="fileInput" accept="image/*">
-                    <button onclick="sendMessage()">Отправить</button>
+                    <button onclick="showSettings()">Настройки</button>
+                    <button onclick="logout()">Выйти</button>
                 </div>
             </div>
+            
+            <div class="chat-view">
+                <div class="chat-sidebar">
+                    <div class="chat-container">
+                        <h2>Мои чаты</h2>
+                        <button onclick="createNewChat()">Создать новый чат</button>
+                        <div id="chatList" class="chat-list"></div>
+                    </div>
+                </div>
+                
+                <div class="chat-content">
+                    <div id="currentChatContainer" class="chat-container">
+                        <h2 id="chatTitle">Выберите чат</h2>
+                        <div id="chatLinkContainer" class="hidden">
+                            <p>Пригласительная ссылка:</p>
+                            <div id="chatLink"></div>
+                            <button onclick="copyChatLink()">Копировать ссылку</button>
+                        </div>
+                        <div id="messagesContainer"></div>
+                        <div class="message-input-area">
+                            <input type="text" id="messageInput" placeholder="Введите сообщение..." disabled>
+                            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                            <button onclick="document.getElementById('fileInput').click()">📷</button>
+                            <button id="sendButton" onclick="sendMessage()" disabled>Отправить</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Настройки -->
+        <div id="settingsContainer" class="settings-container hidden">
+            <h2>Настройки профиля</h2>
+            <div class="settings-row">
+                <img id="avatarPreview" src="https://ui-avatars.com/api/?name=User&background=random" class="avatar-preview">
+                <div>
+                    <input type="file" id="avatarUpload" accept="image/*">
+                    <button onclick="document.getElementById('avatarUpload').click()">Изменить аватар</button>
+                </div>
+            </div>
+            <div class="settings-row">
+                <input type="text" id="nicknameInput" placeholder="Ваш никнейм">
+                <button onclick="updateNickname()">Сохранить</button>
+            </div>
+            <div class="settings-row">
+                <h3>Тема оформления:</h3>
+                <div class="theme-selector">
+                    <div class="theme-option selected" style="background: #f5f5f5;" onclick="changeTheme('light')"></div>
+                    <div class="theme-option" style="background: #1a1a1a;" onclick="changeTheme('dark')"></div>
+                    <div class="theme-option" style="background: #f0e6ff;" onclick="changeTheme('purple')"></div>
+                    <div class="theme-option" style="background: #e6f7ff;" onclick="changeTheme('blue')"></div>
+                </div>
+            </div>
+            <button onclick="hideSettings()">Закрыть настройки</button>
         </div>
     </div>
 
     <script>
-        // Хранилище данных (заменяет базу данных)
+        // Хранилище данных
         let users = JSON.parse(localStorage.getItem('chatAppUsers')) || [];
         let chats = JSON.parse(localStorage.getItem('chatAppChats')) || [];
         let currentUser = null;
         let currentChat = null;
+        let themes = {
+            light: {
+                '--bg-color': '#f5f5f5',
+                '--primary-color': '#4CAF50',
+                '--secondary-color': '#45a049',
+                '--text-color': '#333',
+                '--card-bg': 'white'
+            },
+            dark: {
+                '--bg-color': '#1a1a1a',
+                '--primary-color': '#2E7D32',
+                '--secondary-color': '#1B5E20',
+                '--text-color': '#f0f0f0',
+                '--card-bg': '#2d2d2d'
+            },
+            purple: {
+                '--bg-color': '#f0e6ff',
+                '--primary-color': '#7b1fa2',
+                '--secondary-color': '#6a1b9a',
+                '--text-color': '#333',
+                '--card-bg': '#ffffff'
+            },
+            blue: {
+                '--bg-color': '#e6f7ff',
+                '--primary-color': '#0288d1',
+                '--secondary-color': '#0277bd',
+                '--text-color': '#333',
+                '--card-bg': '#ffffff'
+            }
+        };
 
         // Инициализация при загрузке
         window.onload = function() {
@@ -143,11 +370,20 @@
             const chatId = urlParams.get('join');
             const token = localStorage.getItem('chatAppToken');
             
+            // Загрузка темы
+            const savedTheme = localStorage.getItem('chatAppTheme') || 'light';
+            changeTheme(savedTheme, true);
+            
             if (token) {
                 const user = users.find(u => u.token === token);
                 if (user) {
                     currentUser = user;
                     showMainInterface();
+                    
+                    // Загрузка аватара
+                    if (currentUser.avatar) {
+                        document.getElementById('avatarPreview').src = currentUser.avatar;
+                    }
                     
                     if (chatId) {
                         joinChat(chatId);
@@ -162,6 +398,22 @@
                 document.getElementById('loginForm').scrollIntoView();
                 alert('Войдите или зарегистрируйтесь, чтобы присоединиться к чату');
             }
+            
+            // Обработчики для загрузки аватара
+            document.getElementById('avatarUpload').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        document.getElementById('avatarPreview').src = event.target.result;
+                        if (currentUser) {
+                            currentUser.avatar = event.target.result;
+                            localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
         };
 
         // Функции авторизации
@@ -189,6 +441,11 @@
                 showMainInterface();
                 loadUserChats();
                 
+                // Загрузка аватара
+                if (currentUser.avatar) {
+                    document.getElementById('avatarPreview').src = currentUser.avatar;
+                }
+                
                 // Проверяем, есть ли в URL приглашение в чат
                 const urlParams = new URLSearchParams(window.location.search);
                 const chatId = urlParams.get('join');
@@ -203,6 +460,7 @@
         function register() {
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
+            const nickname = document.getElementById('registerNickname').value || email.split('@')[0];
             
             if (users.some(u => u.email === email)) {
                 alert('Пользователь с таким email уже существует');
@@ -214,8 +472,11 @@
                 id: generateId(),
                 email,
                 password,
+                nickname,
                 token,
-                chats: []
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nickname)}&background=random`,
+                chats: [],
+                theme: 'light'
             };
             
             users.push(newUser);
@@ -223,6 +484,9 @@
             localStorage.setItem('chatAppUsers', JSON.stringify(users));
             localStorage.setItem('chatAppToken', token);
             showMainInterface();
+            
+            // Устанавливаем аватар
+            document.getElementById('avatarPreview').src = newUser.avatar;
         }
 
         function logout() {
@@ -237,6 +501,7 @@
         function showMainInterface() {
             document.getElementById('authContainer').classList.add('hidden');
             document.getElementById('mainContainer').classList.remove('hidden');
+            document.getElementById('settingsContainer').classList.add('hidden');
         }
 
         function createNewChat() {
@@ -274,12 +539,19 @@
             currentUser.chats.forEach(chatId => {
                 const chat = chats.find(c => c.id === chatId);
                 if (chat) {
+                    const lastMessage = chat.messages.length > 0 
+                        ? chat.messages[chat.messages.length - 1].text 
+                        : 'Нет сообщений';
+                    
                     const chatCard = document.createElement('div');
                     chatCard.className = 'chat-card';
+                    if (currentChat && chat.id === currentChat.id) {
+                        chatCard.classList.add('active');
+                    }
                     chatCard.innerHTML = `
                         <h3>${chat.name}</h3>
+                        <p>${lastMessage.substring(0, 30)}${lastMessage.length > 30 ? '...' : ''}</p>
                         <p>Участников: ${chat.members.length}</p>
-                        <p>Сообщений: ${chat.messages.length}</p>
                     `;
                     chatCard.onclick = () => openChat(chat);
                     chatList.appendChild(chatCard);
@@ -291,6 +563,11 @@
             currentChat = chat;
             document.getElementById('chatTitle').textContent = chat.name;
             document.getElementById('chatLink').textContent = `${window.location.origin}${window.location.pathname}?join=${chat.id}`;
+            document.getElementById('chatLinkContainer').classList.remove('hidden');
+            
+            // Активируем поле ввода
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendButton').disabled = false;
             
             // Показываем сообщения
             const messagesContainer = document.getElementById('messagesContainer');
@@ -301,7 +578,7 @@
                 messageElement.className = 'message';
                 
                 const sender = users.find(u => u.id === msg.sender);
-                const senderName = sender ? sender.email : 'Неизвестный';
+                const senderName = sender ? (sender.nickname || sender.email) : 'Неизвестный';
                 
                 let content = msg.text;
                 if (msg.image) {
@@ -309,7 +586,10 @@
                 }
                 
                 messageElement.innerHTML = `
-                    <div class="user-info">${senderName}</div>
+                    <div class="user-info">
+                        <img src="${sender?.avatar || 'https://ui-avatars.com/api/?name=User&background=random'}" class="user-avatar">
+                        ${senderName}
+                    </div>
                     <div>${content}</div>
                     <div class="timestamp">${new Date(msg.timestamp).toLocaleString()}</div>
                 `;
@@ -317,7 +597,9 @@
             });
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            document.getElementById('currentChatContainer').classList.remove('hidden');
+            
+            // Обновляем список чатов с активным состоянием
+            loadUserChats();
         }
 
         function joinChat(chatId) {
@@ -349,13 +631,13 @@
             if (!text && !file) return;
             
             // Для демо-версии сохраняем изображения как Data URL
-            // В реальном приложении нужно загружать на сервер
             let imageData = null;
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     imageData = e.target.result;
                     saveMessage(text, imageData);
+                    fileInput.value = '';
                 };
                 reader.readAsDataURL(file);
             } else {
@@ -386,18 +668,23 @@
             }
             
             messageElement.innerHTML = `
-                <div class="user-info">${currentUser.email}</div>
+                <div class="user-info">
+                    <img src="${currentUser.avatar || 'https://ui-avatars.com/api/?name=User&background=random'}" class="user-avatar">
+                    ${currentUser.nickname || currentUser.email}
+                </div>
                 <div>${content}</div>
                 <div class="timestamp">${new Date(newMessage.timestamp).toLocaleString()}</div>
             `;
             messagesContainer.appendChild(messageElement);
             
-            // Очищаем поля ввода
+            // Очищаем поле ввода
             document.getElementById('messageInput').value = '';
-            document.getElementById('fileInput').value = '';
             
             // Прокручиваем к новому сообщению
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Обновляем список чатов
+            loadUserChats();
         }
 
         function copyChatLink() {
@@ -409,6 +696,60 @@
             document.execCommand('copy');
             window.getSelection().removeAllRanges();
             alert('Ссылка скопирована в буфер обмена');
+        }
+
+        // Настройки
+        function showSettings() {
+            document.getElementById('settingsContainer').classList.remove('hidden');
+            document.getElementById('nicknameInput').value = currentUser.nickname || currentUser.email.split('@')[0];
+        }
+
+        function hideSettings() {
+            document.getElementById('settingsContainer').classList.add('hidden');
+        }
+
+        function updateNickname() {
+            const newNickname = document.getElementById('nicknameInput').value.trim();
+            if (newNickname && currentUser) {
+                currentUser.nickname = newNickname;
+                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                
+                // Обновляем аватар, если используется дефолтный
+                if (currentUser.avatar.includes('ui-avatars.com')) {
+                    currentUser.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(newNickname)}&background=random`;
+                    document.getElementById('avatarPreview').src = currentUser.avatar;
+                    localStorage.setItem('chatAppUsers', JSON.stringify(users));
+                }
+                
+                alert('Никнейм обновлен');
+            }
+        }
+
+        function changeTheme(themeName, initialLoad = false) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            
+            // Применяем тему
+            for (const [key, value] of Object.entries(theme)) {
+                document.documentElement.style.setProperty(key, value);
+            }
+            
+            // Обновляем текущую тему
+            if (currentUser) {
+                currentUser.theme = themeName;
+                localStorage.setItem('chatAppUsers', JSON.stringify(users));
+            }
+            
+            // Обновляем выбранную тему в настройках
+            if (!initialLoad) {
+                document.querySelectorAll('.theme-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                document.querySelector(`.theme-option[onclick="changeTheme('${themeName}')"]`).classList.add('selected');
+            }
+            
+            // Сохраняем тему
+            localStorage.setItem('chatAppTheme', themeName);
         }
 
         // Вспомогательные функции
