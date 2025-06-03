@@ -46,7 +46,7 @@
             margin-bottom: 20px;
         }
         
-        .auth-container, .chat-container, .settings-container {
+        .auth-container, .chat-container, .settings-container, .search-container {
             background: var(--card-bg);
             border-radius: 8px;
             padding: 20px;
@@ -253,6 +253,25 @@
             border-color: var(--primary-color);
         }
         
+        .search-results {
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        
+        .search-result-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .search-result-item:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+        
         @media (max-width: 768px) {
             .chat-view {
                 flex-direction: column;
@@ -273,7 +292,7 @@
                 <h2>Вход</h2>
                 <input type="email" id="loginEmail" placeholder="Email" required>
                 <input type="password" id="loginPassword" placeholder="Пароль" required>
-                <button onclick="login()">Войти</button>
+                <button id="loginButton" onclick="login()">Войти</button>
                 <p>Нет аккаунта? <a href="#" onclick="showRegisterForm()">Зарегистрироваться</a></p>
             </div>
             <div id="registerForm" class="hidden">
@@ -281,7 +300,7 @@
                 <input type="email" id="registerEmail" placeholder="Email" required>
                 <input type="password" id="registerPassword" placeholder="Пароль" required>
                 <input type="text" id="registerNickname" placeholder="Ваш никнейм">
-                <button onclick="register()">Зарегистрироваться</button>
+                <button id="registerButton" onclick="register()">Зарегистрироваться</button>
                 <p>Уже есть аккаунт? <a href="#" onclick="showLoginForm()">Войти</a></p>
             </div>
         </div>
@@ -301,6 +320,11 @@
                     <div class="chat-container">
                         <h2>Мои чаты</h2>
                         <button onclick="createNewChat()">Создать новый чат</button>
+                        <div class="search-container">
+                            <h3>Поиск пользователей</h3>
+                            <input type="text" id="userSearch" placeholder="Введите email или никнейм">
+                            <div id="searchResults" class="search-results hidden"></div>
+                        </div>
                         <div id="chatList" class="chat-list"></div>
                     </div>
                 </div>
@@ -392,6 +416,11 @@
         window.onload = function() {
             initStorage();
             
+            // Назначение обработчиков событий
+            document.getElementById('registerButton').addEventListener('click', register);
+            document.getElementById('loginButton').addEventListener('click', login);
+            document.getElementById('userSearch').addEventListener('input', searchUsers);
+            
             const urlParams = new URLSearchParams(window.location.search);
             const chatId = urlParams.get('join');
             const token = localStorage.getItem('chatAppToken');
@@ -410,7 +439,7 @@
                     
                     // Если есть chatId в URL, пробуем присоединиться
                     if (chatId) {
-                        setTimeout(() => joinChat(chatId), 100); // Небольшая задержка для инициализации
+                        setTimeout(() => joinChat(chatId), 100);
                     } else {
                         loadUserChats();
                     }
@@ -446,51 +475,191 @@
             });
         };
 
-        // Функция для присоединения к чату
-        function joinChat(chatId) {
-            const chats = getChats();
-            const chat = chats.find(c => c.id === chatId);
+        // Поиск пользователей
+        function searchUsers() {
+            const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+            const resultsContainer = document.getElementById('searchResults');
             
-            if (!chat) {
-                alert('Чат не найден. Возможно, он был удалён.');
-                // Очищаем параметр join из URL
-                const url = new URL(window.location);
-                url.searchParams.delete('join');
-                window.history.pushState({}, '', url);
+            if (searchTerm.length < 2) {
+                resultsContainer.classList.add('hidden');
                 return;
             }
             
-            // Проверяем, состоит ли пользователь уже в чате
-            if (!chat.members.includes(currentUser.id)) {
-                chat.members.push(currentUser.id);
-                const chatIndex = chats.findIndex(c => c.id === chatId);
+            const users = getUsers();
+            const filteredUsers = users.filter(user => 
+                (user.email.toLowerCase().includes(searchTerm) || 
+                 (user.nickname && user.nickname.toLowerCase().includes(searchTerm))) &&
+                user.id !== currentUser.id
+            );
+            
+            resultsContainer.innerHTML = '';
+            
+            if (filteredUsers.length === 0) {
+                resultsContainer.innerHTML = '<div class="search-result-item">Пользователи не найдены</div>';
+            } else {
+                filteredUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'search-result-item';
+                    userElement.innerHTML = `
+                        <div class="user-info">
+                            <img src="${user.avatar || 'https://ui-avatars.com/api/?name=User&background=random'}" class="user-avatar">
+                            ${user.nickname || user.email}
+                        </div>
+                    `;
+                    userElement.onclick = () => inviteUserToChat(user.id);
+                    resultsContainer.appendChild(userElement);
+                });
+            }
+            
+            resultsContainer.classList.remove('hidden');
+        }
+
+        function inviteUserToChat(userId) {
+            if (!currentChat) {
+                alert('Сначала выберите чат или создайте новый');
+                return;
+            }
+            
+            const users = getUsers();
+            const user = users.find(u => u.id === userId);
+            
+            if (!user) {
+                alert('Пользователь не найден');
+                return;
+            }
+            
+            if (currentChat.members.includes(userId)) {
+                alert('Пользователь уже в этом чате');
+                return;
+            }
+            
+            if (confirm(`Пригласить ${user.nickname || user.email} в чат "${currentChat.name}"?`)) {
+                currentChat.members.push(userId);
+                user.chats.push(currentChat.id);
+                
+                const chats = getChats();
+                const chatIndex = chats.findIndex(c => c.id === currentChat.id);
                 if (chatIndex !== -1) {
-                    chats[chatIndex] = chat;
+                    chats[chatIndex] = currentChat;
                     saveChats(chats);
                 }
                 
-                const users = getUsers();
-                const userIndex = users.findIndex(u => u.id === currentUser.id);
+                const userIndex = users.findIndex(u => u.id === userId);
                 if (userIndex !== -1) {
-                    users[userIndex].chats.push(chatId);
+                    users[userIndex] = user;
                     saveUsers(users);
-                    currentUser = users[userIndex];
                 }
+                
+                alert('Пользователь приглашен в чат');
+                document.getElementById('searchResults').classList.add('hidden');
+                document.getElementById('userSearch').value = '';
             }
-            
-            // Открываем чат
-            openChat(chat);
-            
-            // Очищаем параметр join из URL
-            const url = new URL(window.location);
-            url.searchParams.delete('join');
-            window.history.pushState({}, '', url);
         }
 
-        // Остальные функции (login, register, createNewChat, openChat, sendMessage и т.д.)
-        // остаются без изменений, как в предыдущем коде
-        // ... (вставьте сюда все остальные функции из предыдущего кода)
+        // Функции авторизации
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
 
+        function showLoginForm() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                alert('Заполните все поля');
+                return;
+            }
+            
+            const users = getUsers();
+            const user = users.find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                currentUser = user;
+                const token = generateToken();
+                user.token = token;
+                localStorage.setItem('chatAppToken', token);
+                
+                const userIndex = users.findIndex(u => u.id === user.id);
+                if (userIndex !== -1) {
+                    users[userIndex] = user;
+                    saveUsers(users);
+                }
+                
+                showMainInterface();
+                loadUserChats();
+                
+                // Загрузка аватара
+                if (currentUser.avatar) {
+                    document.getElementById('avatarPreview').src = currentUser.avatar;
+                }
+                
+                // Проверяем, есть ли в URL приглашение в чат
+                const urlParams = new URLSearchParams(window.location.search);
+                const chatId = urlParams.get('join');
+                if (chatId) {
+                    setTimeout(() => joinChat(chatId), 100);
+                }
+            } else {
+                alert('Неверный email или пароль');
+            }
+        }
+
+        function register() {
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const nickname = document.getElementById('registerNickname').value || email.split('@')[0];
+            
+            if (!email || !password) {
+                alert('Заполните все обязательные поля');
+                return;
+            }
+            
+            const users = getUsers();
+            if (users.some(u => u.email === email)) {
+                alert('Пользователь с таким email уже существует');
+                return;
+            }
+            
+            const token = generateToken();
+            const newUser = {
+                id: generateId(),
+                email,
+                password,
+                nickname,
+                token,
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(nickname)}&background=random`,
+                chats: [],
+                theme: 'light'
+            };
+            
+            users.push(newUser);
+            saveUsers(users);
+            
+            currentUser = newUser;
+            localStorage.setItem('chatAppToken', token);
+            showMainInterface();
+            
+            // Устанавливаем аватар
+            document.getElementById('avatarPreview').src = newUser.avatar;
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('chatAppToken');
+            document.getElementById('mainContainer').classList.add('hidden');
+            document.getElementById('authContainer').classList.remove('hidden');
+            window.location.href = window.location.pathname;
+        }
+
+        // Остальные функции (createNewChat, openChat, joinChat, sendMessage и т.д.)
+        // ... (остаются без изменений, как в предыдущем коде)
+        
         // Вспомогательные функции
         function generateId() {
             return Math.random().toString(36).substr(2, 9);
